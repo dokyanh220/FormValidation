@@ -1,4 +1,17 @@
 function Validator(formSelector) {
+
+    function getParent (element, selector) {
+
+        while (element.parentElement) {
+            if (element.parentElement.matches(selector)){
+                return element.parentElement
+            }
+
+            element = element.parentElement
+        }
+
+    }
+
     var formRules = {}
 
     /*
@@ -26,8 +39,6 @@ function Validator(formSelector) {
         }
 
     }
-
-    var ruleName
 
 
     // Lấy ra form element trong DOM theo `formSelector`
@@ -65,9 +76,59 @@ function Validator(formSelector) {
                 }
             }
             
+            // Lắng nghe sự kiện để Validate (blur, change, ..)
+            input.onblur = handleValidate;
+            input.oninput = handleClearError;
         }
-        console.log(formRules)
 
+        // Thực hiện Validate
+        function handleValidate (event) {
+            var rules = formRules[event.target.name]
+            var errorMessage;
 
+            rules.find(function (rule) {
+                errorMessage = rule(event.target.value)
+                return errorMessage
+            })
+
+            if(errorMessage) {
+                var formGroup = getParent(event.target, '.form-group')
+                if (formGroup) {
+                    var formMessage = formGroup.querySelector('.form-message')
+                    if (formMessage) {
+                        formGroup.classList.add('invalid')
+                        formMessage.innerText = errorMessage
+                    }
+                }
+            }
+
+            return !errorMessage
+        }
+
+        function handleClearError (event) {
+            var formGroup = getParent(event.target, '.form-group')
+            if (formGroup.classList.contains('invalid')){
+                formGroup.classList.remove('invalid')
+                var formMessage = formGroup.querySelector('.form-message')
+
+                if(formMessage) {
+                    formMessage.innerText = ''
+                }
+            }
+        }
     }
+
+    formElement.onsubmit = function (event) {
+        event.preventDefault()
+        var inputs = formElement.querySelectorAll('[name][rules]')
+        var isValid = true
+
+       for(var input of inputs){
+           if(!handleValidate({target: input})) {
+            isValid = false
+           }
+       }
+    }
+
+
 }

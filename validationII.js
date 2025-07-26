@@ -1,4 +1,6 @@
-function Validator(formSelector) {
+function Validator(formSelector, option = {}) {
+    var _this = this
+    var formRules = {}
 
     function getParent (element, selector) {
 
@@ -12,7 +14,26 @@ function Validator(formSelector) {
 
     }
 
-    var formRules = {}
+    function resetForm(){
+        var inputs = formElement.querySelectorAll('input');
+        var selects = formElement.querySelectorAll('select');
+        inputs.forEach(function(input) {
+            switch(input.type) {
+                case 'checkbox':
+                case 'radio':
+                    input.checked = false;
+                    break;
+                case 'file':
+                    input.value = null;
+                    break;
+                default:
+                    input.value = '';
+            }
+        });
+        inputs.forEach((input) => {
+            handleClearError({target: input})
+        })
+    }
 
     /*
     * Quy ước tạo rule:
@@ -55,17 +76,18 @@ function Validator(formSelector) {
             var  rules = input.getAttribute('rules').split('|')
             for(var rule of rules) {
 
-                var ruleInfo;
-                var isRuleHasValue = rule.includes(':')
+                var ruleInfo;  // Mục đích sử dụng cho rule `min, max`
+                var isRuleHasValue = rule.includes(':') // VD: min:6, tách phần tử bởi dấu `:`
 
                 if(isRuleHasValue){
                     ruleInfo = rule.split(':')
-                    rule = ruleInfo[0]
+                    rule = ruleInfo[0] // Rule là phần tử 0
                 }
 
                 var ruleFunc = validatorRules[rule]
 
                 if(isRuleHasValue) {
+                    // Lấy value của rule là phần tử 1
                     ruleFunc = ruleFunc(ruleInfo[1])
                 }
             
@@ -86,10 +108,11 @@ function Validator(formSelector) {
             var rules = formRules[event.target.name]
             var errorMessage;
 
-            rules.find(function (rule) {
+            for (var rule of rules) {
                 errorMessage = rule(event.target.value)
-                return errorMessage
-            })
+
+                if(errorMessage) break;
+            }
 
             if(errorMessage) {
                 var formGroup = getParent(event.target, '.form-group')
@@ -105,6 +128,7 @@ function Validator(formSelector) {
             return !errorMessage
         }
 
+        // Xóa lỗi khi người dùng nhập ký tự
         function handleClearError (event) {
             var formGroup = getParent(event.target, '.form-group')
             if (formGroup.classList.contains('invalid')){
@@ -123,11 +147,50 @@ function Validator(formSelector) {
         var inputs = formElement.querySelectorAll('[name][rules]')
         var isValid = true
 
-       for(var input of inputs){
-           if(!handleValidate({target: input})) {
-            isValid = false
-           }
-       }
+        for(var input of inputs){
+            if(!handleValidate({target: input})) {
+                isValid = false
+            }
+        }
+
+        if (isValid) {
+            
+            if (typeof _this.onSubmit === 'function') {
+
+                // Lấy các input không bị disabled
+                var enableInputs = formElement.querySelectorAll('[name]:not([disabled])')
+                // Tạo object chứa giá trị các input
+                var formValues = Array.from(enableInputs).reduce(function(values, input) {
+                switch(input.type) {
+                    case 'radio':
+                        var checked = formElement.querySelector('input[name="' + input.name + '"]:checked');
+                        values[input.name] = checked ? checked.value : '';
+                        break;
+                    case 'checkbox':
+                        if(!input.matches(':checked')){
+                            return values;
+                        } 
+                        if(!Array.isArray(values[input.name])){
+                            values[input.name] = [];
+                        } 
+                        values[input.name].push(input.value);
+                        break;
+                    case 'file':
+                        values[input.name] = input.files;
+                        break;
+                    default:
+                        values[input.name] = input.value;
+                }
+                return values;
+                }, {})
+                    
+                _this.onSubmit(formValues)
+                resetForm()
+
+            } else {
+                formElement.submit()
+            }
+        }
     }
 
 
